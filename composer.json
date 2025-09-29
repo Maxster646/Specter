@@ -1,0 +1,13 @@
+{
+    "name": "maxi/specter",
+    "description": "Simple and powerful PHP cool-framework for cool-services",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "Specter\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.1"
+    }
+}
