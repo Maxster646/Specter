@@ -1,37 +1,34 @@
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
-
 use Specter\Core\App;
+
+require __DIR__ . '/../vendor/autoload.php';
 
 $app = new App();
 
-// Global middleware: simple request logger
-$app->middleware(function () {
-    $method = $_SERVER['REQUEST_METHOD'];
-    $uri = $_SERVER['REQUEST_URI'];
-    error_log("[$method] $uri");
+// --------------------
+// Simple Routes
+// --------------------
+$app->get('/', function () use ($app) {
+    return $app->json(['message' => 'Welcome to Specter Framework']);
 });
 
-// Home route
-$app->get('/', function () {
-    return 'Welcome to Specter Framework';
+$app->get('/user/{id}', function ($id) use ($app) {
+    return $app->json(['status' => 'ok', 'user_id' => $id]);
 });
 
-// Route with parameter
-$app->get('/user/{id}', function ($id) {
-    return [
-        'status' => 'ok',
-        'user_id' => $id
-    ];
+// --------------------
+// Route Groups Example
+// --------------------
+$app->group('/api', function ($app) {
+    $app->get('/status', function () use ($app) {
+        return $app->json(['status' => 'API is running']);
+    });
+
+    $app->post('/echo', function () use ($app) {
+        $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        return $app->json(['echo' => $data]);
+    });
 });
 
-// POST route that echoes received JSON
-$app->post('/echo', function () {
-    $input = file_get_contents('php://input');
-    $data = json_decode($input, true) ?? [];
-    return ['received' => $data];
-});
-
-// Run the application
 $app->run();

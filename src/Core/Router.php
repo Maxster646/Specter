@@ -5,52 +5,81 @@ namespace Specter\Core;
 class Router
 {
     /**
-     * Stores all routes organized by HTTP method
-     *
+     * Array to store all routes by method
      * @var array
      */
     private array $routes = [];
 
     /**
-     * Register a route for a specific HTTP method
-     *
-     * @param string   $method  HTTP method (GET, POST, etc.)
-     * @param string   $path    Route path, supports parameters like /user/{id}
-     * @param callable $handler Function to execute when route matches
+     * Current group prefix for route grouping
+     * @var string
      */
-    public function add(string $method, string $path, callable $handler): void
+    private string $currentGroupPrefix = '';
+
+    /**
+     * Add a route to the router
+     *
+     * @param string $method HTTP method (GET, POST, etc.)
+     * @param string $path Route path
+     * @param callable|string $handler Closure or controller@method
+     */
+    public function add(string $method, string $path, callable|string $handler): void
     {
-        $method = strtoupper($method);
+        $path = $this->currentGroupPrefix . $path;
         $this->routes[$method][$path] = $handler;
     }
 
     /**
-     * Dispatch the incoming request to the correct route handler
+     * Create a group of routes with a shared prefix
      *
-     * @param string $method HTTP method of the request
-     * @param string $uri    URI of the request
-     * @return mixed|null    Handler response or null if no match
+     * @param string $prefix Route prefix
+     * @param callable $callback Function that defines grouped routes
+     */
+    public function group(string $prefix, callable $callback): void
+    {
+        $previousPrefix = $this->currentGroupPrefix;
+        $this->currentGroupPrefix .= $prefix;
+        $callback($this); // Pass Router instance to callback
+        $this->currentGroupPrefix = $previousPrefix;
+    }
+
+    /**
+     * Dispatch a request to the matching route
+     *
+     * @param string $method HTTP method
+     * @param string $uri Request URI
+     * @return mixed|null Response or null if not found
      */
     public function dispatch(string $method, string $uri)
     {
-        $method = strtoupper($method);
-        $uri = rtrim($uri, '/'); // remove trailing slash
-
         if (!isset($this->routes[$method])) {
             return null;
         }
 
-        foreach ($this->routes[$method] as $route => $handler) {
-            // Convert route parameters {param} into regex capture groups
-            $pattern = preg_replace('#\{[\w]+\}#', '([\w-]+)', $route);
-            $pattern = "#^" . rtrim($pattern, '/') . "$#";
+        foreach ($this->routes[$method] as $path => $handler) {
+            $pattern = preg_replace('#\{[\w]+\}#', '([\w-]+)', $path);
+            $pattern = '#^' . $pattern . '$#';
 
             if (preg_match($pattern, $uri, $matches)) {
-                array_shift($matches); // remove full match
-                return call_user_func_array($handler, $matches);
+                array_shift($matches); // Remove full match
+
+                // If handler is controller@method string, call the method
+                if (is_string($handler) && strpos($handler, '@') !== false) {
+                    [$controller, $methodName] = explode('@', $handler);
+                    $controllerClass = "App\\Controllers\\$controller";
+                    if (class_exists($controllerClass)) {
+                        $obj = new $controllerClass();
+                        return $obj->$methodName(...$matches);
+                    }
+                }
+
+                // Otherwise, call closure
+                if (is_callable($handler)) {
+                    return $handler(...$matches);
+                }
             }
         }
 
-        return null; // no route matched
+        return null;
     }
 }
